@@ -21,8 +21,7 @@ class EvaluateBase:
         self.all_preds = []
         self.all_labels = []
 
-    def eval(self, loader, model):
-        self.model = model
+    def eval(self, loader):
         self.model.eval()
         self.model.state = 'eval'
         for batch_data in tqdm(loader, desc='eval: '):

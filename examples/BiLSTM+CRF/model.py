@@ -13,24 +13,25 @@ from theshy.model.crf import CRF
 
 
 class BiLSTM_CRF(nn.Module):
-    def __init__(self, dataset, embedding_dim, hidden_dim, device='cpu'):
+    def __init__(self, config, device='cpu'):
         super(BiLSTM_CRF, self).__init__()
-        self.embedding_dim = embedding_dim  # 词向量维度
-        self.hidden_dim = hidden_dim  # 隐层维度
-        self.vocab_size = len(dataset.vocab)  # 词表大小
-        self.tagset_size = len(dataset.label_map)  # 标签个数
+        self.config = config
+        self.embedding_dim = config.embedding_dim  # 词向量维度
+        self.hidden_dim = config.hidden_dim  # 隐层维度
+        self.vocab_size = len(config.vocab)  # 词表大小
+        self.tagset_size = len(config.label_map)  # 标签个数
         self.device = device
         # 记录状态，'train'、'eval'、'pred'对应三种不同的操作
         self.state = 'train'  # 'train'、'eval'、'pred'
 
-        self.word_embeds = nn.Embedding(self.vocab_size, embedding_dim)
+        self.word_embeds = nn.Embedding(self.vocab_size, self.embedding_dim)
         # BiLSTM会将两个方向的输出拼接，维度会乘2，所以在初始化时维度要除2
-        self.lstm = nn.LSTM(embedding_dim, hidden_dim // 2, num_layers=2, bidirectional=True, batch_first=True)
+        self.lstm = nn.LSTM(self.embedding_dim, self.hidden_dim // 2, num_layers=2, bidirectional=True, batch_first=True)
 
         # BiLSTM 输出转化为各个标签的概率，此为CRF的发射概率
-        self.hidden2tag = nn.Linear(hidden_dim, self.tagset_size, bias=False)
+        self.hidden2tag = nn.Linear(self.hidden_dim, self.tagset_size, bias=False)
         # 初始化CRF类
-        self.crf = CRF(dataset, device)
+        self.crf = CRF(config, device)
         self.dropout = nn.Dropout(p=0.5, inplace=True)
         self.layer_norm = nn.LayerNorm(self.hidden_dim)
 
@@ -44,6 +45,20 @@ class BiLSTM_CRF(nn.Module):
         seq_unpacked, _ = torch.nn.utils.rnn.pad_packed_sequence(lstm_out, batch_first=True)
 
         seqence_output = self.layer_norm(seq_unpacked)
+        lstm_feats = self.hidden2tag(seqence_output)
+        return lstm_feats
+
+    # 另一种实现RNN处理不等长序列的方式
+    def __get_lstm_features(self, sentence, seq_len):
+        max_len = sentence.shape[1]
+        mask = [[1] * seq_len[i] + [0] * (max_len - seq_len[i]) for i in range(sentence.shape[0])]
+
+        embeds = self.word_embeds(sentence)
+        self.dropout(embeds)
+        mask = torch.tensor(mask, dtype=torch.float32, device=self.device)
+        input = embeds * mask.unsqueeze(2)
+        lstm_out, _ = self.lstm(input)
+        seqence_output = self.layer_norm(lstm_out)
         lstm_feats = self.hidden2tag(seqence_output)
         return lstm_feats
 

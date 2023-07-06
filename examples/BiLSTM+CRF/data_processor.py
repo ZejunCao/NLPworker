@@ -12,6 +12,8 @@ import pickle
 
 import torch
 from torch.utils.data import Dataset
+from torch.utils.data import DataLoader
+
 
 
 def get_label_map(data_path):
@@ -153,15 +155,14 @@ def data_process(path):
         data.append([texts, label])
     return data
 
-
 class Mydataset(Dataset):
-    def __init__(self, file_path, vocab, label_map):
+    def __init__(self, config, file_path):
+        self.config = config
         self.file_path = file_path
-        # 数据预处理
         self.data = data_process(self.file_path)
-        self.label_map, self.label_map_inv = label_map
-        self.vocab, self.vocab_inv = vocab
-        # self.data为中文汉字和英文标签，将其转化为索引形式
+        self.label_map = self.config.label_map
+        # 建立中文词表，扫描训练集所有字符得到，'PAD'在batch填充时使用，'UNK'用于替换字表以外的新字符
+        self.vocab = self.config.vocab
         self.examples = []
         for text, label in self.data:
             t = [self.vocab.get(t, self.vocab['UNK']) for t in text]
@@ -187,6 +188,7 @@ class Mydataset(Dataset):
         # 填充到最大长度，文本用'PAD'补齐，标签用'O'补齐
         text = [t + [self.vocab['PAD']] * (max_len - len(t)) for t in text]
         label = [l + [self.label_map['O']] * (max_len - len(l)) for l in label]
+        mask = [[1] * seq_len[i] + [0] * (max_len - seq_len[i]) for i in range(len(text))]
 
         # 将其转化成tensor，再输入到模型中，这里的dtype必须是long否则报错
         # text 和 label shape：(batch_size, max_len)
@@ -194,5 +196,26 @@ class Mydataset(Dataset):
         text = torch.tensor(text, dtype=torch.long)
         label = torch.tensor(label, dtype=torch.long)
         seq_len = torch.tensor(seq_len, dtype=torch.long)
+        mask = torch.tensor(mask, dtype=torch.long)
 
-        return text, label, seq_len
+        return text, label, seq_len, mask
+
+
+
+def Loader(config, state='train'):
+    if state == 'train':
+        dataset = Mydataset(config, config.train_file_path)
+        loader = DataLoader(dataset, batch_size=config.train_batch_size, num_workers=0, pin_memory=False, shuffle=True,
+                                      collate_fn=dataset.collect_fn)
+    elif state == 'eval':
+        dataset = Mydataset(config, config.valid_file_path)
+        loader = DataLoader(dataset, batch_size=config.valid_batch_size, num_workers=0, pin_memory=False, shuffle=False,
+                                      collate_fn=dataset.collect_fn)
+    elif state == 'test':
+        dataset = Mydataset(config, config.test_file_path)
+        loader = DataLoader(dataset, batch_size=config.train_batch_size, num_workers=0, pin_memory=False, shuffle=False,
+                                      collate_fn=dataset.collect_fn)
+    else:
+        raise Exception('请输入正确的state:["train", "eval", "test"]')
+
+    return loader

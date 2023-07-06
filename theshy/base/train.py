@@ -50,7 +50,7 @@ class TrainBase:
                       f'  total_remaining_time: {datetime.timedelta(seconds=int((len(loader) * self.config.epochs - (len(loader) * epoch + step)) / (len(loader) * epoch + step) * (time.time() - total_start)))}')
 
             print(f'loss avg: {self.losses / len(loader)}')
-            result = self.evaluater.eval(self.valid_loader, self.model)
+            result = self.evaluater.eval(self.valid_loader)
             scheduler.step(result[2])
             print(f'result: {result}')
 

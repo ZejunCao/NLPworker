@@ -26,10 +26,10 @@ def log_sum_exp(vec):
 
 
 class CRF(nn.Module):
-    def __init__(self, dataset, device='cpu'):
+    def __init__(self, config, device='cpu'):
         super(CRF, self).__init__()
-        self.label_map = dataset.label_map
-        self.label_map_inv = dataset.label_map_inv
+        self.label_map = config.label_map
+        self.label_map_inv = config.label_map_inv
         self.tagset_size = len(self.label_map)
         self.device = device
 
