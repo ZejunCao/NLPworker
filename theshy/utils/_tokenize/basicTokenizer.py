@@ -2,10 +2,10 @@
 # -*- coding: utf-8 -*-
 # @Author  : Cao Zejun
 # @Time    : 2023/3/25 1:10
-# @File    : common.py
+# @File    : basicTokenizer.py
 # @Software: PyCharm
 # @System  : Windows
-# @desc    : null
+# @desc    : 用空格或特殊符号将英文和中文分割成单词或字
 
 import unicodedata
 
