@@ -7,6 +7,7 @@
 # @System  : Windows
 # @desc    : null
 
+import os
 import time
 import datetime
 import torch
@@ -22,12 +23,17 @@ class TrainBase:
             self.evaluater = evaluater
             self.valid_loader = valid_loader
         self.loss = torch.tensor(0)
+        # 创建保存checkpoint文件夹
+        self.checkpoint_path = os.path.join(self.config.project_path, 'checkpoint', f"{datetime.datetime.now().strftime('%m%d-%H-%M')}")
+        os.makedirs(self.checkpoint_path, exist_ok=True)
+        # 用来存储验证结果
+        self.results = []
 
     def train(self, loader):
         total_start = time.time()
         # optimizer = optim.Adam(self.model.parameters(), lr=self.config.lr, weight_decay=self.config.weight_decay)
         optimizer = optim.Adam(self.model.parameters(), lr=self.config.lr)
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=3, verbose=1)
+        # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=3, verbose=1)
         for epoch in range(self.config.epochs):
             epoch_start = time.time()
             self.model.train()
@@ -51,8 +57,23 @@ class TrainBase:
 
             print(f'loss avg: {self.losses / len(loader)}')
             result = self.evaluater.eval(self.valid_loader)
-            scheduler.step(result[2])
+            result.update({"path": os.path.join(self.checkpoint_path,
+                                                f"epoch{epoch}_{self.config.metric_eval_type}{result[self.config.metric_eval_type]}.bin")})
+            # scheduler.step(result[2])
             print(f'result: {result}')
+            self.save_checkpoint(result)
+
+    # 保存最近和最优的checkpoint
+    def save_checkpoint(self, result):
+        if len(self.results) >= 2:
+            if self.results[0][self.config.metric_eval_type] <= self.results[1][self.config.metric_eval_type]:
+                os.remove(self.results[0]['path'])
+                del self.results[0]
+            else:
+                os.remove(self.results[1]['path'])
+                del self.results[1]
+        self.results.append(result)
+        torch.save(self.model.state_dict(), result['path'])
 
     def train_one_batch(self, batch_data):
         pass
