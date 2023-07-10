@@ -10,7 +10,7 @@
 import json
 import re
 from collections import defaultdict
-from theshy.utils._tokenize.common import BasicTokenizer
+from theshy.utils._tokenize.basicTokenizer import BasicTokenizer
 
 # 代码参考: https://leimao.github.io/blog/Byte-Pair-Encoding/#Byte-Pair-Encoding-Algorithm
 # 代码参考：https://github.com/rsennrich/subword-nmt
