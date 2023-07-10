@@ -5,7 +5,7 @@
 # @File    : train.py
 # @Software: PyCharm
 # @System  : Windows
-# @desc    : null
+# @desc    : 训练文件base，含有训练流程通用操作，针对项目的特有操作放在子类中
 
 import os
 import time
@@ -23,17 +23,19 @@ class TrainBase:
             self.evaluater = evaluater
             self.valid_loader = valid_loader
         self.loss = torch.tensor(0)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=self.config.lr)
+        # optimizer = optim.Adam(self.model.parameters(), lr=self.config.lr, weight_decay=self.config.weight_decay)
+        # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=3, verbose=1)
         # 创建保存checkpoint文件夹
-        self.checkpoint_path = os.path.join(self.config.project_path, 'checkpoint', f"{datetime.datetime.now().strftime('%m%d-%H-%M')}")
+        self.checkpoint_path = os.path.join(self.config.project_path, 'checkpoint', f"{datetime.datetime.now().strftime('%m%d-%H-%M-%S')}")
         os.makedirs(self.checkpoint_path, exist_ok=True)
         # 用来存储验证结果
         self.results = []
+        if self.config.train_checkpoint:
+            self.model.load_state_dict(torch.load(self.config.train_checkpoint, map_location=self.device))
 
     def train(self, loader):
         total_start = time.time()
-        # optimizer = optim.Adam(self.model.parameters(), lr=self.config.lr, weight_decay=self.config.weight_decay)
-        optimizer = optim.Adam(self.model.parameters(), lr=self.config.lr)
-        # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=3, verbose=1)
         for epoch in range(self.config.epochs):
             epoch_start = time.time()
             self.model.train()
@@ -44,8 +46,8 @@ class TrainBase:
 
                 self.train_one_batch(data)
                 self.loss.backward()
-                optimizer.step()
-                optimizer.zero_grad()
+                self.optimizer.step()
+                self.optimizer.zero_grad()
                 self.losses += self.loss
 
                 print(f'Epoch: [{epoch + 1}/{self.config.epochs}],'
@@ -58,7 +60,7 @@ class TrainBase:
             print(f'loss avg: {self.losses / len(loader)}')
             result = self.evaluater.eval(self.valid_loader)
             result.update({"path": os.path.join(self.checkpoint_path,
-                                                f"epoch{epoch}_{self.config.metric_eval_type}{result[self.config.metric_eval_type]}.bin")})
+                                                f"epoch-{epoch+1}_{self.config.metric_eval_type}-{result[self.config.metric_eval_type]}.bin")})
             # scheduler.step(result[2])
             print(f'result: {result}')
             self.save_checkpoint(result)

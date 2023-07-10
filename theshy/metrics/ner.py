@@ -215,12 +215,45 @@ def cal_metrics(correct_count, pred_count, label_count, sort_labels=None, digits
         report += info.format(a + ' avg', *f1, width=width, digits=digits)
     print(report)
 
-    return_metric = []
+    return_metric = {}
     # 将最终指标precision、recall、f1-score三个值返回，用于模型训练评估
-    for i in avg_metric[return_avg_type][:3]:
-        return_metric.append(round(i, digits))
+    # 以字典形式返回
+    return_metric['precision'] = round(avg_metric[return_avg_type][0], digits)
+    return_metric['recall'] = round(avg_metric[return_avg_type][1], digits)
+    return_metric['f1'] = round(avg_metric[return_avg_type][2], digits)
     return return_metric
 
+
+# 预测序列实体提取
+def chunks_extract(pred):
+    if not pred:
+        return []
+
+    cur_entity = None
+    res = []
+    st_idx, end_idx = 0, 0
+    for i, pred_single in enumerate(pred):
+        pred_start_B = pred_single.startswith('B')
+        pred_entity = pred_single.split('-')[-1]
+
+        if cur_entity:
+            if pred_start_B or cur_entity != pred_entity:
+                res.append({
+                    'st_idx': st_idx,
+                    'end_idx': i,
+                    'label': cur_entity
+                })
+                cur_entity = None
+        if pred_start_B:
+            st_idx = i
+            cur_entity = pred_entity
+    if cur_entity:
+        res.append({
+            'st_idx': st_idx,
+            'end_idx': len(pred),
+            'label': cur_entity,
+        })
+    return res
 
 if __name__ == '__main__':
     y_pred = ['O', 'B-address', 'I-address', 'I-name', 'O', 'B-name', 'I-name', 'I-name']

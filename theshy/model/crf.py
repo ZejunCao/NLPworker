@@ -11,11 +11,6 @@ import torch
 from torch import nn
 
 
-def argmax(vec):
-    _, idx = torch.max(vec, 1)
-    return idx.item()
-
-
 # log sum exp 增强数值稳定性
 # 改进了torch版本原始函数.可适用于两种情况计算得分
 def log_sum_exp(vec):
@@ -35,7 +30,7 @@ class CRF(nn.Module):
 
         # 转移概率矩阵
         self.transitions = nn.Parameter(
-            torch.randn(self.tagset_size, self.tagset_size)).to(self.device)
+            torch.randn(self.tagset_size, self.tagset_size))
 
         # 增加开始和结束标志，并手动干预转移概率
         self.START_TAG = "<START>"
@@ -110,28 +105,22 @@ class CRF(nn.Module):
         forward_var = init_vvars
         # 传入的就是单个序列,在每个时间步上遍历
         for feat in feats:
-            bptrs_t = []  # holds the backpointers for this step
-            viterbivars_t = []  # holds the viterbi variables for this step
-
-            # 一个标签一个标签去计算处理
-            for next_tag in range(self.tagset_size):
-                # 前一时间步分数 + 转移到第 next_tag 个标签的概率
-                next_tag_var = forward_var + self.transitions[next_tag]
-                # 得到最大分数所对应的索引,即前一时间步哪个标签过来的分数最高
-                best_tag_id = argmax(next_tag_var)
-                # 将该索引添加到路径中
-                bptrs_t.append(best_tag_id)
-                # 将此分数保存下来
-                viterbivars_t.append(next_tag_var[0][best_tag_id].view(1))
-            # 在这里加上当前时间步的发射概率，因为之前计算每个标签的最大分数来源与当前时间步发射概率无关
-            forward_var = (torch.cat(viterbivars_t) + feat).view(1, -1)
-            # 将当前时间步所有标签最大分数的来源索引保存
+            # 将上一时间步的总概率复制tagset_size次，以便一次性加上所有转移概率
+            forward_var = forward_var.repeat(feat.shape[0], 1)
+            next_tag_var = forward_var + self.transitions
+            # 对每个标签位置取最大值的索引
+            bptrs_t = torch.max(next_tag_var, 1)[1].tolist()
+            # 取出当前时间步所有最大值的概率
+            viterbivars_t = next_tag_var[range(forward_var.shape[0]), bptrs_t]
+            # 加上当前时间步的发射概率
+            forward_var = (viterbivars_t + feat).view(1, -1)
+            # 记录最大值的索引，后续回溯用
             backpointers.append(bptrs_t)
 
         # 手动加入转移到结束标签的概率
         terminal_var = forward_var + self.transitions[self.label_map[self.STOP_TAG]]
         # 在最终位置得到最高分数所对应的索引
-        best_tag_id = argmax(terminal_var)
+        best_tag_id = torch.max(terminal_var, 1)[1].item()
         # 最高分数
         path_score = terminal_var[0][best_tag_id]
 

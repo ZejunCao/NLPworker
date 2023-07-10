@@ -16,9 +16,9 @@ from torch.utils.data import DataLoader
 
 
 
-def get_label_map(data_path):
+def get_label_map(config):
     # 标签字典保存路径
-    label_map_path = './data/cluener_public/label_map.json'
+    label_map_path = config.label_map_path
     # 第一次运行需要遍历训练集获取到标签字典，并存储成json文件保存，第二次运行即可直接载入json文件
     if os.path.exists(label_map_path):
         with open(label_map_path, 'r', encoding='utf-8') as fp:
@@ -26,7 +26,7 @@ def get_label_map(data_path):
     else:
         # 读取json数据
         json_data = []
-        with open(data_path, 'r', encoding='utf-8') as fp:
+        with open(config.train_file_path, 'r', encoding='utf-8') as fp:
             for line in fp:
                 json_data.append(json.loads(line))
         '''
@@ -70,9 +70,9 @@ def get_label_map(data_path):
     label_map_inv = {v: k for k, v in label_map.items()}
     return label_map, label_map_inv
 
-def get_vocab(data_path):
+def get_vocab(config):
     # 词表保存路径
-    vocab_path = './data/cluener_public/vocab.pkl'
+    vocab_path = config.vocab_path
     # 第一次运行需要遍历训练集获取到标签字典，并存储成json文件保存，第二次运行即可直接载入json文件
     if os.path.exists(vocab_path):
         with open(vocab_path, 'rb') as fp:
@@ -80,7 +80,7 @@ def get_vocab(data_path):
     else:
         json_data = []
         # 加载数据集
-        with open(data_path, 'r', encoding='utf-8') as fp:
+        with open(config.train_file_path, 'r', encoding='utf-8') as fp:
             for line in fp:
                 json_data.append(json.loads(line))
         # 建立词表字典，提前加入'PAD'和'UNK'
@@ -147,39 +147,54 @@ def data_process(path):
 
         # 对字符串进行字符级分割
         # 英文文本如'bag'分割成'b'，'a'，'g'三位字符，数字文本如'125'分割成'1'，'2'，'5'三位字符
-        texts = []
-        for t in json_data[i]['text']:
-            texts.append(t)
+        text = [t for t in json_data[i]['text']]
 
         # 将文本和标签编成一个列表添加到返回数据中
-        data.append([texts, label])
+        data.append([text, label])
+    return data
+
+# 测试文件数据处理
+def data_process_test(path):
+    json_data = []
+    with open(path, 'r', encoding='utf-8') as fp:
+        for line in fp:
+            json_data.append(json.loads(line))
+    data = []
+    for d in json_data:
+        text = [t for t in d['text']]
+        label = ['O' for _ in text]
+        data.append([text, label])
     return data
 
 class Mydataset(Dataset):
     def __init__(self, config, file_path):
         self.config = config
         self.file_path = file_path
-        self.data = data_process(self.file_path)
+        if not hasattr(config, 'label_map'):
+            config.label_map, config.label_map_inv = get_label_map(self.config)
+            config.vocab, config.vocab_inv = get_vocab(self.config)
         self.label_map = self.config.label_map
         # 建立中文词表，扫描训练集所有字符得到，'PAD'在batch填充时使用，'UNK'用于替换字表以外的新字符
         self.vocab = self.config.vocab
         self.examples = []
-        for text, label in self.data:
-            t = [self.vocab.get(t, self.vocab['UNK']) for t in text]
-            l = [self.label_map[l] for l in label]
-            self.examples.append([t, l])
+
+        if config.state == 'pred':
+            self.data = data_process_test(self.file_path)
+        else:
+            self.data = data_process(self.file_path)
 
     def __getitem__(self, item):
-        return self.examples[item]
+        return self.data[item]
 
     def __len__(self):
         return len(self.data)
 
-    def collect_fn(self, batch):
+    def collate_fn(self, batch):
         # 取出一个batch中的文本和标签，将其单独放到变量中处理
         # 长度为batch_size，每个序列长度为原始长度
-        text = [t for t, l in batch]
-        label = [l for t, l in batch]
+        original_text = [t for t, l in batch]
+        text = [[self.vocab.get(i, self.vocab['UNK']) for i in t] for t, l in batch]
+        label = [[self.label_map[i] for i in l] for t, l in batch]
         # 获取一个batch内所有序列的长度，长度为batch_size
         seq_len = [len(i) for i in text]
         # 提取出最大长度用于填充
@@ -198,24 +213,29 @@ class Mydataset(Dataset):
         seq_len = torch.tensor(seq_len, dtype=torch.long)
         mask = torch.tensor(mask, dtype=torch.long)
 
-        return text, label, seq_len, mask
+        return {
+            'original_text': original_text,
+            'text': text,
+            'label': label,
+            'seq_len': seq_len,
+            'mask': mask,
+        }
 
 
-
-def Loader(config, state='train'):
-    if state == 'train':
+def Loader(config):
+    if config.state == 'train':
         dataset = Mydataset(config, config.train_file_path)
         loader = DataLoader(dataset, batch_size=config.train_batch_size, num_workers=0, pin_memory=False, shuffle=True,
-                                      collate_fn=dataset.collect_fn)
-    elif state == 'eval':
+                                      collate_fn=dataset.collate_fn)
+    elif config.state == 'eval':
         dataset = Mydataset(config, config.valid_file_path)
         loader = DataLoader(dataset, batch_size=config.valid_batch_size, num_workers=0, pin_memory=False, shuffle=False,
-                                      collate_fn=dataset.collect_fn)
-    elif state == 'test':
+                                      collate_fn=dataset.collate_fn)
+    elif config.state == 'pred':
         dataset = Mydataset(config, config.test_file_path)
         loader = DataLoader(dataset, batch_size=config.train_batch_size, num_workers=0, pin_memory=False, shuffle=False,
-                                      collate_fn=dataset.collect_fn)
+                                      collate_fn=dataset.collate_fn)
     else:
-        raise Exception('请输入正确的state:["train", "eval", "test"]')
+        raise Exception('请输入正确的config.state:["train", "eval", "pred"]')
 
     return loader

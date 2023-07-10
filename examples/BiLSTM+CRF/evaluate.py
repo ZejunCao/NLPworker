@@ -19,20 +19,19 @@ from config import Config
 from data_processor import Loader
 
 
-class Evaluater(EvaluateBase):
+class Evaluator(EvaluateBase):
     def eval_one_batch(self, batch_data):
         with torch.no_grad():
-            text, label, seq_len, mask = batch_data
-            text = text.to(self.device)
-            label = label.to(self.device)
-            seq_len = seq_len.to(self.device)
+            text = batch_data['text'].to(self.device)
+            label = batch_data['label'].to(self.device)
+            seq_len = batch_data['seq_len'].to(self.device)
 
             batch_tag = self.model(text, label, seq_len)
 
             self.all_labels.extend([[self.config.label_map_inv[t] for t in l[:seq_len[i]].tolist()] for i, l in enumerate(label.cpu())])
             self.all_preds.extend([[self.config.label_map_inv[t] for t in l] for l in batch_tag])
 
-    def get_matrics(self, labels, preds):
+    def get_metrics(self, labels, preds):
         sort_labels = [k for k in self.config.label_map.keys()]
 
         # get_result_token_level(labels, preds, digits=3)
@@ -42,10 +41,12 @@ class Evaluater(EvaluateBase):
 if __name__ == '__main__':
     device = "cuda" if torch.cuda.is_available() else "cpu"
     config = Config()
+    config.state = 'eval'
 
-    valid_dataloader = Loader(config, state='eval')
+    valid_dataloader = Loader(config)
 
+    # torch.manual_seed(1234)
     model = BiLSTM_CRF(config, device).to(device)
 
-    evaluater = Evaluater(model)
-    evaluater.eval(valid_dataloader)
+    evaluator = Evaluator(model, only_eval=True)
+    evaluator.eval(valid_dataloader)
