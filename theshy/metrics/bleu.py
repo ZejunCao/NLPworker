@@ -6,9 +6,8 @@
 # @ Software: PyCharm
 # @System   : Windows
 # @desc     : bleu指标计算
-import math
 
-from nltk.translate.bleu_score import corpus_bleu
+import math
 from collections import defaultdict
 
 
@@ -75,7 +74,11 @@ def sentence_level_bleu(list_reference, candidate, weights=None):
 if __name__ == '__main__':
     references = [['my', 'first', 'correct', 'sentence', 'penguin'], ['my', 'first', 'correct', 'sentence', 'sentence', 'sentence', 'crrect', 'sentence', 'sentence', 'sentence'], ['my', 'first', 'correct', 'sentence', 'sentence', 'crrect', 'crrect', 'crrect', 'crrect']]
     candidates = ['my', 'first', 'correct', 'sentence', 'sentence', 'apple', 'tiger', 'penguin']
-    score = corpus_bleu([references], [candidates], weights=(0.25, 0.25, 0.25, 0.25))
-    print(score)
+
+    # nltk包测试样例，用于对比使用
+    # from nltk.translate.bleu_score import corpus_bleu
+    # score = corpus_bleu([references], [candidates], weights=(0.25, 0.25, 0.25, 0.25))
+    # print(score)
+
     score = sentence_level_bleu(references, candidates, weights=(0.25, 0.25, 0.25, 0.25))
     print(score)
