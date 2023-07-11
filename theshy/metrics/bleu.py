@@ -27,7 +27,7 @@ def sentence_level_bleu(list_reference, candidate, weights=None):
     # 修改weights设置为负数的情况
     for w in weights:
         if w < 0:
-            raise f"请设置weights为正数，当前{weights}"
+            raise Exception(f"请设置weights为正数，当前{weights}")
     # 对于weights和不为1的情况，将其归一化
     if sum(weights) != 1:
         weights = [1 / sum(weights) * w for w in weights]
