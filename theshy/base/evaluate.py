@@ -17,7 +17,7 @@ class EvaluateBase:
     def __init__(self, model, only_eval=False):
         self.config = model.config
         self.model = model
-        self.device = model.device
+        self.device = self.config.device
         self.all_preds = []
         self.all_labels = []
         if only_eval and self.config.eval_checkpoint:
