@@ -6,6 +6,12 @@
 # @ Software: PyCharm
 # @System   : Windows
 # @desc     : word2vec算法训练
+
+# Penn Tree Bank（PTB）数据集,该语料库取自“华尔街日报”的文章，分为训练集、验证集和测试集。
+# 在原始格式中，文本文件的每一行表示由空格分隔的一句话。在这里，我们将每个单词视为一个词元。
+# PTB数据下载地址:https://www.ldc.upenn.edu/data-management
+
+
 import math
 import random
 import time
@@ -62,7 +68,7 @@ class Mydataset(Dataset):
         # 将数据集做成id形式，删除超低频次
         dataset = [[self.token2id[token] for token in line if token in self.token2id] for line in txt_data]
 
-        # 二次采样，低频词和低频次一起出现对模型更有益，所以以一定概率丢弃某些词，概率为P(w)=max(1-sqrt(1e-4/(w次数/总词数)), 0)
+        # 下采样，低频词和低频次一起出现对模型更有益，所以以一定概率丢弃某些词，概率为P(w)=max(1-sqrt(1e-4/(w次数/总词数)), 0)
         def discard(idx):
             return random.uniform(0, 1) < max(1 - math.sqrt(1e-4 / self.counter[self.id2token[idx]] * total_token), 0)
         # 二次采样之后的数据集,如'the'这种词就删除了很多，'join'这种词删除的很少
