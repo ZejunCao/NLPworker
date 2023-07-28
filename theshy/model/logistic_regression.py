@@ -19,8 +19,8 @@ class Logistic_Regression:
         self.lr = lr
         self.max_iterations = max_iterations
 
-    def fit(self, input, label, input_test, label_test, n_target=2):
-        self.n_target = n_target
+    def fit(self, input, label, input_test, label_test):
+        self.n_target = len(set(label))
         # 多分类,使用softmax
         if self.n_target > 2:
             self.weights = np.random.normal(0, 0.1, (input.shape[1], self.n_target))
@@ -113,11 +113,11 @@ if __name__ == '__main__':
     X = iris.data
     y = iris.target
     print(X.data.shape)
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.15, random_state=420)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.15, random_state=42)
     # 一共150个样本，分别是50个类别1、50个类别2、50个类别3，若想测试二分类可以取前100个样本
     # X_train, X_test, y_train, y_test = train_test_split(X[:100], y[:100], test_size=0.15, random_state=420)
     LR = Logistic_Regression(optimizer='GD', lr=0.5, max_iterations=5000)
-    LR.fit(X_train, y_train, X_test, y_test, n_target=3)
+    LR.fit(X_train, y_train, X_test, y_test)
 
     # lrl1 = LR(penalty="l1", solver="liblinear", C=0.5, max_iter=1000)
     # # lrl2 = LR(penalty="l2", solver="liblinear", C=0.5, max_iter=1000)
