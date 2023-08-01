@@ -220,8 +220,7 @@ class Decision_Tree:
             return node
 
         # 计算 H(D) = -∑(p_i * log2(p_i))
-        H_D = [sum(label == c) / len(label) for c in set(label)]  # p_i
-        H_D = sum([-p * np.log2(p) for p in H_D])  # -∑(p_i * log2(p_i))
+        H_D = self.info_gain(label)
         # 用来存储各个特征的信息增益
         g_D_A = []
         # 信息增益比
@@ -241,8 +240,7 @@ class Decision_Tree:
                 # ∑(|x^i_j| / |D| * H(D_j)), 具体i,j,k字母有变化
                 H_D_Ai = 0
                 for k, v in counter.items():
-                    H_D_j = [sum(label[input[:, i] == k] == j) / v for j in cur_n_target]  # x^i_k中标签为j的个数 / x^i_k的个数
-                    H_D_j = sum([-p * np.log2(p) if p != 0 else 0 for p in H_D_j])  # -∑(p_i * log2(p_i))
+                    H_D_j = self.info_gain(label[input[:, i] == k])  # x^i_k中标签为j的个数 / x^i_k的个数
                     H_D_Ai += v / len(input) * H_D_j  # ∑(|x^i_j| / |D| * H(D_j))
                 g_D_A.append(H_D - H_D_Ai)   # H(D) - H(D|A_i)
                 # H_A_i(D) = -∑(p_j * log2(p_j))   这里的p_i代表特征A_i的第j个取值的统计概率
@@ -271,24 +269,24 @@ class Decision_Tree:
                     collection_proportion = [len(input_split[0]) / len(input), len(input_split[1]) / len(input)]
                     # 每个正负集中各个标签的所占的比例
                     # 负集：[标签0比例，标签1比例，标签2比例]；正集：[标签0比例，标签1比例，标签2比例]；
-                    H_D_j = [[sum(label_split[p_n] == j) / len(label_split[p_n]) for p_n in range(2)] for j in range(max(cur_n_target)+1)]
+                    # H_D_j = [[sum(label_split[p_n] == j) / len(label_split[p_n]) for p_n in range(2)] for j in range(max(cur_n_target)+1)]
                     # [负集H-：-标签0比例*log2(标签0比例) - 标签1比例*log2(标签1比例) - 标签2比例*log2(标签2比例),
                     #  正集H+：-标签0比例*log2(标签0比例) - 标签1比例*log2(标签1比例) - 标签2比例*log2(标签2比例)]
-                    a = [sum([-H_D_j[j][p_n] * np.log2(H_D_j[j][p_n]) if H_D_j[j][p_n] != 0 else 0 for j in cur_n_target]) for p_n in range(2)]
+                    # a = [sum([-H_D_j[j][p_n] * np.log2(H_D_j[j][p_n]) if H_D_j[j][p_n] != 0 else 0 for j in cur_n_target]) for p_n in range(2)]
+                    p_n_gain = [self.info_gain(label_split[p_n]) for p_n in range(2)]
                     # 负集所占比例*负集H- + 正集所占比例*正集H+，得到该分割点的信息增益
-                    a = sum([collection_proportion[p_n] * a[p_n] for p_n in range(2)])
+                    p_n_gain = sum([collection_proportion[p_n] * p_n_gain[p_n] for p_n in range(2)])
                     # 计算信息增益比：先得到 -负集所占比例*log2(负集所占比例) - 正集所占比例*log2(正集所占比例)
                     H_A_i = sum([-p * np.log2(p) for p in collection_proportion])
-                    split_candidate_gain.append(H_D - a)
-                    split_candidate_gain_ratio.append((H_D - a) / H_A_i)
+
+                    split_candidate_gain.append(H_D - p_n_gain)
+                    split_candidate_gain_ratio.append((H_D - p_n_gain) / H_A_i)
                 # 取信息增益比最高的分割点作为该特征分割点
                 split_index = np.argmax(np.array(split_candidate_gain_ratio))
                 continuous_info[i] = {}
                 continuous_info[i]['split_value'] = candidate_values[split_index]
                 g_D_A.append(split_candidate_gain[split_index])
                 g_D_A_ratio.append(split_candidate_gain_ratio[split_index])
-        if len(g_D_A) != len(g_D_A_ratio):
-            print()
         # 先取出信息增益高于平均水平的特征，将其设置为负无穷
         g_D_A = np.array(g_D_A)
         candidate_gain = [0 if i else -np.inf for i in g_D_A > g_D_A.mean()]
@@ -308,6 +306,16 @@ class Decision_Tree:
                 node.next[k] = self.C4_5_continuous(input[input[:, max_gain] == k], label[input[:, max_gain] == k],
                                         already_index + [max_gain], continuous=continuous)
         return node
+
+    def info_gain(self, data_set):
+        '''
+        计算信息增益，data_set数据集中各个标签的数量除以总数量，再取 -∑(p_i * log2(p_i))
+        :param data_set:
+        :return:
+        '''
+        H_D = [sum(data_set == c) / len(data_set) for c in range(self.n_target)]  # p_i
+        H_D = sum([-p * np.log2(p) if p != 0 else 0 for p in H_D])  # -∑(p_i * log2(p_i))
+        return H_D
 
     def post_pruning(self, input_valid, label_valid, node=None):
         '''
