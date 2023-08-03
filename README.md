@@ -25,9 +25,13 @@ NLPworker是一个深度学习快速开发平台，它将大多数项目中共�
     - bleu：机器翻译任务评价指标，bleu1-4
     - rouge_：机器摘要任务评价指标,包括rouge-n、rouge-l
   - model：复现的机器学习模型
-    - crf
-    - pageRank
-    - tfidf
+    - crf：在LSTM或BERT输出端添加CRF，学习序列之间的联系
+    - pageRank：实现迭代法、幂法、代数算法求解
+    - tfidf：添加平滑处理
+    - decision_tree：决策树，实现ID3、C4.5、CART，实现连续值处理与后剪枝，
+      使用鸢尾花数据集和california房价预测数据集学习预测分类和回归问题
+    - logistic_regression：逻辑回归，解决二分类和多分类问题，使用鸢尾花数据集学习预测
+    - naive_bayes：朴素贝叶斯，添加OOV平滑处理，使用鸢尾花数据集学习预测
   - utils：工具文件
     - _tokenize
       - basicTokenizer：基础分词器
