@@ -17,6 +17,7 @@ import torch.optim as optim
 class TrainBase:
     def __init__(self, model, evaluater=None, valid_loader=None):
         self.config = model.config
+        self.logger = model.config.logger
         self.model = model
         self.device = model.device
         if evaluater:
@@ -26,9 +27,6 @@ class TrainBase:
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.config.lr)
         # optimizer = optim.Adam(self.model.parameters(), lr=self.config.lr, weight_decay=self.config.weight_decay)
         # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=3, verbose=1)
-        # 创建保存checkpoint文件夹
-        self.checkpoint_path = os.path.join(self.config.project_path, 'checkpoint', f"{datetime.datetime.now().strftime('%m%d-%H-%M-%S')}")
-        os.makedirs(self.checkpoint_path, exist_ok=True)
         # 用来存储验证结果
         self.results = []
         if self.config.train_checkpoint:
@@ -50,19 +48,19 @@ class TrainBase:
                 self.optimizer.zero_grad()
                 self.losses += self.loss
 
-                print(f'Epoch: [{epoch + 1}/{self.config.epochs}],'
+                self.logger.info(f'Epoch: [{epoch + 1}/{self.config.epochs}],'
                       f'  cur_epoch_finished: {step * self.config.train_batch_size / len(loader.dataset) * 100:2.2f}%,'
                       f'  loss: {self.loss.item():2.4f},'
                       f'  cur_step_time: {time.time() - start:2.2f}s,'
-                      f'  cur_epoch_remaining_time: {datetime.timedelta(seconds=int((len(loader) - step) / step * (time.time() - epoch_start)))}',
+                      f'  cur_epoch_remaining_time: {datetime.timedelta(seconds=int((len(loader) - step) / step * (time.time() - epoch_start)))},'
                       f'  total_remaining_time: {datetime.timedelta(seconds=int((len(loader) * self.config.epochs - (len(loader) * epoch + step)) / (len(loader) * epoch + step) * (time.time() - total_start)))}')
 
-            print(f'loss avg: {self.losses / len(loader)}')
+            self.logger.info(f'loss avg: {self.losses / len(loader)}')
             result = self.evaluater.eval(self.valid_loader)
             result.update({"path": os.path.join(self.checkpoint_path,
                                                 f"epoch-{epoch+1}_{self.config.metric_eval_type}-{result[self.config.metric_eval_type]}.bin")})
             # scheduler.step(result[2])
-            print(f'result: {result}')
+            self.logger.info(f'result: {result}')
             self.save_checkpoint(result)
 
     # 保存最近和最优的checkpoint

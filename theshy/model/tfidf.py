@@ -65,10 +65,18 @@ class Tfidf:
         vec /= np.sqrt(sum(vec ** 2))
         return vec
 
+def aaa(a, b):
+    res = 0
+    for i in range(len(a)):
+        res += abs(a[i] - b[i])
+    return res
 
 corpus = [
-  "查下 明天 天气",
-  "查下 今天 天气",
+  # "查下 明天 天气",
+  # "查下 今天 天气",
+    "我 喜欢 看 电视 不 喜欢 看 电影",
+    "我 不 喜欢 看 电视 也 不 喜欢 看 电影",
+    "我 喜欢 看 电视 也 喜欢 看 电影",
   # "帮我 查下 明天 北京 天气 怎么样",
   # "帮我 查下 今天 北京 天气 好不好",
   # "帮我 查询 去 北京 的 火车",
@@ -78,12 +86,17 @@ corpus = [
   # "帮我 搜索 上海 有 什么 好玩的 上海",
   # "帮我 找找 上海 东方明珠 在哪"
 ]
-target = '今天 天气 怎么样'
+target = '我 喜欢 看 电视 不 喜欢 看 电影'
 my_tfidf = Tfidf(corpus)
 print('输出每个单词对应的 id 值：', my_tfidf.vocab)
 print('返回idf值：', my_tfidf.idf)
 print('返回各文档的向量：', my_tfidf.docment_vector)
 print('指定文本的向量：', my_tfidf.search_similar(target))
+vec = my_tfidf.docment_vector
+c1 = aaa(vec[0], vec[1])
+c2 = aaa(vec[0], vec[2])
+c3 = aaa(vec[1], vec[2])
+print()
 
 # from sklearn.feature_extraction.text import TfidfVectorizer
 # # 这里若设置use_idf=True, toarray()结果中是乘了idf的

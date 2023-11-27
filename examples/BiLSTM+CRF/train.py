@@ -29,6 +29,7 @@ class Trainer(TrainBase):
 if __name__ == '__main__':
     device = "cuda" if torch.cuda.is_available() else "cpu"
     config = Config()
+    config.device = device
 
     train_dataloader = Loader(config)
     config.state = 'eval'

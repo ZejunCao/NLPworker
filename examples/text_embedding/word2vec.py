@@ -91,7 +91,7 @@ class Mydataset(Dataset):
                 contexts.append([line[i] for i in context_idx])
         return centers, contexts
 
-    # 对于每一对中心词-北京词,随机采样K个噪声词
+    # 对于每一对中心词-背景词,随机采样K个噪声词
     def get_negatives(self, contexts, sampling_weights, K):
         negatives, neg_candidates, i = [], [], 0
         population = list(range(len(sampling_weights)))

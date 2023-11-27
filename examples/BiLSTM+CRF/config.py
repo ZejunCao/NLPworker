@@ -20,8 +20,6 @@ class Config(ConfigBase):
         self.test_file_path = os.path.join(self.root_path, 'test.json')
         self.label_map_path = os.path.join(self.root_path, 'label_map.json')
         self.vocab_path = os.path.join(self.root_path, 'vocab.pkl')
-        self.project_path = os.getcwd()
-        os.makedirs(os.path.join(self.project_path, 'checkpoint'), exist_ok=True)
 
         self.embedding_dim = 128
         self.hidden_dim = 768
@@ -31,9 +29,9 @@ class Config(ConfigBase):
         self.lr = 0.001
         self.weight_decay = 1e-4
 
-        self.train_checkpoint = os.path.join(self.project_path, 'checkpoint', '0710-13-59-44', 'epoch-1_f1-0.711.bin')
-        self.eval_checkpoint = os.path.join(self.project_path, 'checkpoint', '0710-13-59-44', 'epoch-1_f1-0.711.bin')
-        self.pred_checkpoint = os.path.join(self.project_path, 'checkpoint', '0710-13-59-44', 'epoch-1_f1-0.711.bin')
+        # self.train_checkpoint = os.path.join(self.project_path, 'checkpoint', '0710-13-59-44', 'epoch-1_f1-0.711.bin')
+        # self.eval_checkpoint = os.path.join(self.project_path, 'checkpoint', '0710-13-59-44', 'epoch-1_f1-0.711.bin')
+        # self.pred_checkpoint = os.path.join(self.project_path, 'checkpoint', '0710-13-59-44', 'epoch-1_f1-0.711.bin')
 
         # ner任务返回指标类型
         self.metric_all_types = ['precision', 'recall', 'f1']

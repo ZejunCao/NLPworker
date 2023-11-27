@@ -12,6 +12,10 @@
     C4.5：信息增益比，离散值与连续值分割，可手动指定
     测试集分类：对于未出现值，使用当前节点标签
 
+    算法  |  支持模型  |  树结构  |    特征选择     |  连续值处理  |  缺失值处理  |  剪枝
+    ID3  |    分类   |  多叉树  |    信息增益     |    不支持  |     不支持    | 不支持
+    C4.5 |    分类   |  多叉树  |    信息增益比   |     支持  |      支持     |  支持
+    CART | 分类+回归  |  二叉树  | 基尼指数+均方差 |     支持  |      支持     |  支持
 '''
 
 # TODO CART决策树
@@ -31,11 +35,24 @@ class TreeNode:
         self.next = {}
 
 
+class BinaryTreeNode:
+    def __init__(self, left=None, right=None, feature_index=-1, value=0):
+        # CART树的构造树类，二叉树，左子树代表小于等于split_value的，右子树代表大于split_value的
+        self.feature_index = feature_index
+        self.feature_continuous = False
+        self.split_value = 0
+        self.value = value
+        self.left = left
+        self.right = right
+
+
 class Decision_Tree:
     def __init__(self):
+        # 记录递归深度
+        self.iter_count = 0
         pass
 
-    def fit(self, input, label, method='ID3', continuous=[]):
+    def fit(self, input, label, method='ID3', continuous=[], classify=True):
         '''
 
         :param input:
@@ -56,6 +73,12 @@ class Decision_Tree:
         elif method == 'C4.5':
             # self.root = self.C4_5(input, label)
             self.root = self.C4_5_continuous(input, label, continuous=continuous)
+        elif method == 'CART':
+            if classify:
+                self.root = self.CART_classify(input, label, continuous=continuous)
+            else:
+                self.root = self.CART_regression(input, label)
+
 
     # 递归创建树
     def ID3(self, input, label, already_index=[]):
@@ -307,6 +330,123 @@ class Decision_Tree:
                                         already_index + [max_gain], continuous=continuous)
         return node
 
+    def CART_classify(self, input, label, continuous=[]):
+        # 对于离散值，左子树等于切分值，右子树不等于切分值
+        # 对于连续值，左子树小于等于切分值，右子树大于切分值
+        node = BinaryTreeNode()
+        cur_n_target = list(set(label))
+
+        # 如果当前数据集全部是一样的标签
+        if len(cur_n_target) == 1:
+            node.value = label[0]
+            return node
+
+        # 将当前节点的标签值设为所含样本最多的类别，不管子节点还是父节点，防止出现训练数据之外的特征值
+        label_num = [sum(label == i) for i in range(self.n_target)]
+        node.value = label_num.index(max(label_num))
+
+        # 如果递归太深，直接返回
+        if self.iter_count > 1000:
+            return node
+        self.iter_count += 1
+        # print(self.iter_count)
+        # 最优特征和切分值，存储形式为[特征i索引, 特征i基尼系数, 特征i最佳切分值]
+        optimal_feature_and_split = [-1, np.inf, 0]
+        for feature_i in range(input.shape[-1]):
+            # 离散值
+            if feature_i not in continuous:
+                # 选取当前特征所有可取值
+                candidate_values = list(set(input[:, feature_i]))
+                if len(candidate_values) == 1:
+                    continue
+                split_value_gini = []
+                for split_value in candidate_values:
+                    input_split = [input[input[:, feature_i] == split_value], input[input[:, feature_i] != split_value]]
+                    label_split = [label[input[:, feature_i] == split_value], label[input[:, feature_i] != split_value]]
+                    gini_ = sum([len(input_split[i]) / len(input) * self.gini(label_split[i]) for i in range(2)])
+                    split_value_gini.append(gini_)
+            # 连续值
+            else:
+                # 选取当前特征所有可取值，取出所有二分中值作为分割候选值
+                values = sorted(list(set(input[:, feature_i])))
+                if len(values) == 1:
+                    continue
+
+                # 获取可取值的所有二分点作为候选分割点
+                candidate_values = [(values[split_i - 1] + values[split_i]) / 2 for split_i in range(1, len(values))]
+                split_value_gini = []
+
+                for split_value in candidate_values:
+                    input_split = [input[input[:, feature_i] <= split_value], input[input[:, feature_i] > split_value]]
+                    label_split = [label[input[:, feature_i] <= split_value], label[input[:, feature_i] > split_value]]
+                    gini_ = sum([len(input_split[i]) / len(input) * self.gini(label_split[i]) for i in range(2)])
+                    split_value_gini.append(gini_)
+
+            min_index = np.argmin(split_value_gini)
+            if split_value_gini[min_index] < optimal_feature_and_split[1]:
+                optimal_feature_and_split = [feature_i, split_value_gini[min_index], candidate_values[min_index]]
+
+        # 没有可选分割值
+        if optimal_feature_and_split[0] == -1:
+            return node
+        node.feature_index = optimal_feature_and_split[0]
+        node.split_value = optimal_feature_and_split[2]
+        # node.feature_continuous默认为False离散
+        if node.feature_index in continuous:
+            node.feature_continuous = True
+            input_split = [input[input[:, node.feature_index] <= node.split_value], input[input[:, node.feature_index] > node.split_value]]
+            label_split = [label[input[:, node.feature_index] <= node.split_value], label[input[:, node.feature_index] > node.split_value]]
+        else:
+            input_split = [input[input[:, node.feature_index] == node.split_value], input[input[:, node.feature_index] != node.split_value]]
+            label_split = [label[input[:, node.feature_index] == node.split_value], label[input[:, node.feature_index] != node.split_value]]
+
+        if len(label_split[0]) > 1:
+            node.left = self.CART_classify(input_split[0], label_split[0], continuous=continuous)
+        if len(label_split[1]) > 1:
+            node.right = self.CART_classify(input_split[1], label_split[1], continuous=continuous)
+        return node
+
+
+    def CART_regression(self, input, label):
+        # 选择最优切分特征和最优切分点
+        node = BinaryTreeNode()
+        node.value = np.mean(label)
+        # 最优特征和切分值，存储形式为[特征i索引, 特征i最小平方误差, 特征i最佳切分值]
+        optimal_feature_and_split = [0, np.inf, 0]
+        for feature_i in range(input.shape[-1]):
+            # 选取当前特征所有可取值，取出所有二分中值作为分割候选值
+            values = sorted(list(set(input[:, feature_i])))
+            if len(values) == 1:
+                continue
+
+            # 获取可取值的所有二分点作为候选分割点
+            candidate_values = [(values[split_i - 1] + values[split_i]) / 2 for split_i in range(1, len(values))]
+            split_value_se = []
+            for split_value in candidate_values:
+                # 根据分割点将训练集分为两部分
+                input_split = [input[input[:, feature_i] <= split_value], input[input[:, feature_i] > split_value]]
+                label_split = [label[input[:, feature_i] <= split_value], label[input[:, feature_i] > split_value]]
+                # 得到左右两区间标签的均值，用来计算平方误差
+                c = [np.mean(label_split[0]), np.mean(label_split[1])]
+                se_left = np.sum([(l - c[0]) ** 2 for l in label_split[0]])
+                se_right = np.sum([(l - c[1]) ** 2 for l in label_split[1]])
+                split_value_se.append(se_left + se_right)
+            min_index = np.argmin(split_value_se)
+            if split_value_se[min_index] < optimal_feature_and_split[1]:
+                optimal_feature_and_split = [feature_i, split_value_se[min_index], candidate_values[min_index]]
+
+        node.feature_index = optimal_feature_and_split[0]
+        node.split_value = optimal_feature_and_split[2]
+
+        input_split = [input[input[:, node.feature_index] <= node.split_value], input[input[:, node.feature_index] > node.split_value]]
+        label_split = [label[input[:, node.feature_index] <= node.split_value], label[input[:, node.feature_index] > node.split_value]]
+        if len(label_split[0]) > 1:
+            node.left = self.CART_regression(input_split[0], label_split[0])
+        if len(label_split[1]) > 1:
+            node.right = self.CART_regression(input_split[1], label_split[1])
+
+        return node
+
     def info_gain(self, data_set):
         '''
         计算信息增益，data_set数据集中各个标签的数量除以总数量，再取 -∑(p_i * log2(p_i))
@@ -316,6 +456,17 @@ class Decision_Tree:
         H_D = [sum(data_set == c) / len(data_set) for c in range(self.n_target)]  # p_i
         H_D = sum([-p * np.log2(p) if p != 0 else 0 for p in H_D])  # -∑(p_i * log2(p_i))
         return H_D
+
+    def gini(self, data_set):
+        if len(data_set) == 0:
+            return 0
+        gini_coefficient = [sum(data_set == c) / len(data_set) for c in range(self.n_target)]
+        if self.n_target == 2:
+            gini_coefficient = 2 * gini_coefficient[0] * gini_coefficient[1]
+        else:
+            gini_coefficient = 1 - sum([p ** 2 for p in gini_coefficient])
+        return gini_coefficient
+
 
     def post_pruning(self, input_valid, label_valid, node=None):
         '''
@@ -380,6 +531,47 @@ class Decision_Tree:
         accuracy = self.accuracy(pred, label_test)
         return accuracy
 
+    def CART_predict(self, input_test):
+        # 分类与回归都用此方法
+        pred = []
+        for input_i in range(input_test.shape[0]):
+            node = self.root
+            while True:
+                if node.feature_continuous:
+                    if not node.left and not node.right:
+                        pred.append(node.value)
+                        break
+                    if input_test[input_i][node.feature_index] <= node.split_value:
+                        if node.left:
+                            node = node.left
+                        else:
+                            pred.append(node.value)
+                            break
+                    else:
+                        if node.right:
+                            node = node.right
+                        else:
+                            pred.append(node.value)
+                            break
+                else:
+                    if not node.left and not node.right:
+                        pred.append(node.value)
+                        break
+                    if input_test[input_i][node.feature_index] == node.split_value:
+                        if node.left:
+                            node = node.left
+                        else:
+                            pred.append(node.value)
+                            break
+                    else:
+                        if node.right:
+                            node = node.right
+                        else:
+                            pred.append(node.value)
+                            break
+        # mse = self.MSE(pred, label_test)
+        return pred
+
     def to_numpy(self, x):
         if isinstance(x, list):
             x = np.array(x)
@@ -393,6 +585,13 @@ class Decision_Tree:
             pred = np.argmax(pred, axis=-1)
         return sum(pred == label) / pred.shape[0]
 
+    def MSE(self, pred, label):
+        pred = self.to_numpy(pred)
+        label = self.to_numpy(label)
+        assert len(pred) == len(label), 'pred与label长度不一致'
+        mse = [(pred[i] - label[i]) ** 2 for i in range(len(pred))]
+        return np.mean(mse)
+
 
 if __name__ == '__main__':
     iris = load_iris()
@@ -400,7 +599,7 @@ if __name__ == '__main__':
     X = iris.data
     y = iris.target
     print(X.data.shape)
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.15, random_state=57)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.15)
     # X_train = [['青年', '否', '否', '一般'],
     #            ['青年', '否', '否', '好'],
     #            ['青年', '是', '否', '好'],
@@ -432,19 +631,52 @@ if __name__ == '__main__':
     #     scores += tree.classify(X_test, y_test)
     # print(scores/100)
 
+    # tree = Decision_Tree()
+    # tree.fit(X_train, y_train, 'C4.5', continuous=[0,1,2,3])
+    # scores = tree.classify(X_test, y_test)
+    # print(scores)
+    # tree.post_pruning(X_test, y_test)
+    # scores = tree.classify(X_test, y_test)
+    # print(scores)
+    #
     tree = Decision_Tree()
-    tree.fit(X_train, y_train, 'C4.5', continuous=[0,1,2,3])
+    tree.fit(X_train, y_train, 'C4.5', continuous=[3])
     scores = tree.classify(X_test, y_test)
-    print(scores)
-    tree.post_pruning(X_test, y_test)
-    scores = tree.classify(X_test, y_test)
+    # print(scores)
+    # tree.post_pruning(X_test, y_test)
+    # scores = tree.classify(X_test, y_test)
     print(scores)
 
     tree = Decision_Tree()
-    tree.fit(X_train, y_train, 'C4.5', continuous=[])
-    scores = tree.classify(X_test, y_test)
+    tree.fit(X_train, y_train, 'CART', continuous=[3])
+    # scores = tree.classify(X_test, y_test)
+    # print(scores)
+    # tree.post_pruning(X_test, y_test)
+    pred = tree.CART_predict(X_test)
+    scores = tree.accuracy(pred, y_test)
     print(scores)
-    tree.post_pruning(X_test, y_test)
-    scores = tree.classify(X_test, y_test)
-    print(scores)
+
+
+    # 回归树
+    '''
+    输入特征有8个，分别是：
+        MedInc: 街区组收入中位数
+        HouseAge: 街区组房屋年龄中位数
+        AveRooms: 每户平均房间数
+        AveBedrms: 每户平均卧室数量
+        Population: 人口数量
+        AveOccup: 家庭成员的平均人数
+        Latitude: 纬度
+        Longitude: 经度
+    '''
+    # from sklearn.datasets import fetch_california_housing
+    # housing_california = fetch_california_housing()
+    # X = housing_california.data[:300]
+    # y = housing_california.target[:300]
+    # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.15, random_state=57)
+    # tree = Decision_Tree()
+    # tree.fit(X_train, y_train, method='CART', classify=False)
+    # score = tree.regression(X_test, y_test)
+    # print('均方误差为：', score)
+    # print()
 

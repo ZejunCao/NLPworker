@@ -51,6 +51,7 @@ def sentence_level_bleu(list_reference, candidate, weights=None):
     coexisting_count = [0, 0, 0, 0]
     for i in range(4):
         for k in candidate_count[i].keys():
+            # 多个参考取词出现最大值
             rc = max([rc[i][k] for rc in reference_count])
             coexisting_count[i] += min(candidate_count[i][k], rc)
 

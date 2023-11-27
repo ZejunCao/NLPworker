@@ -7,6 +7,8 @@
 # @System   : Windows
 # @desc     : 朴素贝叶斯实现
 
+# TODO 贝叶斯连续值处理
+
 import numpy as np
 from sklearn.datasets import load_iris
 from sklearn.model_selection import train_test_split
@@ -79,6 +81,11 @@ class Naive_Bayes:
         return accuracy
 
     def accuracy(self, pred, label):
+        if isinstance(pred, list):
+            pred = np.array(pred)
+        if isinstance(label, list):
+            label = np.array(label)
+
         if len(pred.shape) != 1:
             pred = np.argmax(pred, axis=-1)
         return sum(pred == label) / pred.shape[0]

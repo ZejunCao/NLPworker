@@ -102,6 +102,11 @@ class Logistic_Regression:
         return -loss.mean()
 
     def accuracy(self, pred, label):
+        if isinstance(pred, list):
+            pred = np.array(pred)
+        if isinstance(label, list):
+            label = np.array(label)
+
         if len(pred.shape) != 1:
             pred = np.argmax(pred, axis=-1)
         return sum(pred == label) / pred.shape[0]
