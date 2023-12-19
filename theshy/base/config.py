@@ -8,8 +8,13 @@
 # @desc    : 配置文件base，设置配置默认值，保证examples未设置时不报错
 
 import os
-import logging
+import sys
 import datetime
+import time
+
+import pytz
+from loguru import logger
+
 
 class ConfigBase:
     def __init__(self):
@@ -18,23 +23,30 @@ class ConfigBase:
         self.pred_checkpoint = ''
 
         self.state = 'train'  # 'train', 'eval', 'pred'
+        self.eval_pre_train = False  # 设置是否需要在开始训练前验证一次
+        self.checkpoint_num = 2  # 保留权重的数量，默认2个，代表最近和历史指标最优的权重
+        self.log_per_step = 1  # 设置每隔多少步打印一次，默认一步一打印
+
         self.project_path = os.getcwd()
-        # os.makedirs(os.path.join(self.project_path, 'checkpoint'), exist_ok=True)
+        self.checkpoint_path = os.path.join(self.project_path, 'checkpoint')
+        self.log_path = os.path.join(self.project_path, 'log')
+        self.start_run_time = datetime.datetime.now(pytz.timezone('Asia/Shanghai')).strftime('%m%d_%H_%M_%S')
+        self.checkpoint_cur_path = os.path.join(self.checkpoint_path, self.start_run_time)
 
-        # 创建保存checkpoint文件夹
-        self.checkpoint_path = os.path.join(self.project_path, 'checkpoint', f"{datetime.datetime.now().strftime('%m%d-%H-%M-%S')}")
-        os.makedirs(self.checkpoint_path, exist_ok=True)
+        if not os.path.exists(self.checkpoint_path):
+            os.mkdir(self.checkpoint_path)
+        if not os.path.exists(self.log_path):
+            os.mkdir(self.log_path)
 
-        self.logger = logging.getLogger(name='nlpworker')
-        self.logger.setLevel(logging.DEBUG)
+        def format_message(record):
+            # 设置北京时间，由于历史原因，这里使用'Asia/Shanghai'代表
+            formatted_time = datetime.datetime.now(pytz.timezone('Asia/Shanghai')).strftime('%Y-%m-%d %H:%M:%S')
+            record = f'<green>{formatted_time}</green>' \
+                     ' | <level>{level: <8}</level> ' \
+                     '| <magenta>{process}</magenta>:<yellow>{thread}</yellow> ' \
+                     '| <cyan>{name}</cyan>:<cyan>{function}</cyan>:<yellow>{line}</yellow> - <level>{message}</level>'
+            return record
 
-        # 1、创建一个handler，该handler往console打印输出
-        console_handler = logging.StreamHandler()
-        file_handler = logging.FileHandler(filename=f'{self.checkpoint_path}/info.log')
-        standard_formatter = logging.Formatter('%(asctime)s %(filename)s line:%(lineno)d %(levelname)s %(message)s %(process)d')
-
-        console_handler.setFormatter(standard_formatter)
-        file_handler.setFormatter(standard_formatter)
-
-        self.logger.addHandler(console_handler)
-        self.logger.addHandler(file_handler)
+        logger.remove(0)
+        logger.add(sys.stderr, format=format_message, level="DEBUG")
+        logger.add(f"{self.log_path}/{self.start_run_time}.log")

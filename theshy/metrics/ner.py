@@ -6,10 +6,10 @@
 # @Software: PyCharm
 # @System  : Windows
 # @desc    : ner任务指标，如精确率、召回率、F1分数
-import time
 
 import numpy as np
 from collections import defaultdict
+from loguru import logger
 
 
 def get_fast_result_token_level(label, pred):
@@ -166,7 +166,7 @@ def cal_metrics(correct_count, pred_count, label_count, sort_labels=None, digits
     for k in sort_labels:
         width = max(width, len(k))
 
-    report = ''
+    report = '\n'
     headers = ['precision', 'recall', 'f1-score', 'correct_num', 'pred_num', 'label_num']
     info = '{:>{width}s} ' + ' {:>9}' * len(headers) + '\n\n'
     report += info.format('', *headers, width=width)
@@ -213,7 +213,7 @@ def cal_metrics(correct_count, pred_count, label_count, sort_labels=None, digits
 
         avg_metric[a] = f1.copy()
         report += info.format(a + ' avg', *f1, width=width, digits=digits)
-    print(report)
+    logger.info(report)
 
     return_metric = {}
     # 将最终指标precision、recall、f1-score三个值返回，用于模型训练评估
@@ -268,12 +268,12 @@ if __name__ == '__main__':
 
     # y_true = ['B-address', 'I-address', 'I-name']
     # f1 = get_fast_result_token_level(y_true, y_pred)
-    # print('fast token micro f1 score', f1)
+    # logger.info('fast token micro f1 score', f1)
 
     # sort_labels = ['B-address', 'I-address', 'B-name', 'I-name']
     # f1 = get_result_token_level(y_true, y_pred, sort_labels=sort_labels, digits=3, return_avg_type='weighted')
-    # print('token level f1 score', f1)
+    # logger.info('token level f1 score', f1)
 
     sort_labels = ['address', 'name']
     f1 = get_result_token_level(y_true, y_pred, sort_labels=sort_labels, digits=3, return_avg_type='macro')
-    print('entity level f1 score', f1)
+    logger.info(f'\nentity level f1 score: {f1}')
